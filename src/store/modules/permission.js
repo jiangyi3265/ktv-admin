@@ -71,10 +71,12 @@ function filterAsyncRouter(asyncRouterMap, lastRouter = false, type = false) {
         route.component = InnerLink
       } else {
         route.component = loadView(route.component)
+        if (!route.component) return false
       }
     }
     if (route.children != null && route.children && route.children.length) {
       route.children = filterAsyncRouter(route.children, route, type)
+      if (!route.children.length) return false
     } else {
       delete route['children']
       delete route['redirect']

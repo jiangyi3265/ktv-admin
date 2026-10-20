@@ -94,7 +94,7 @@ service.interceptors.response.use(res => {
         isRelogin.show = false
       })
     }
-      return Promise.reject('无效的会话，或者会话已过期，请重新登录。')
+      return Promise.reject(Object.assign(new Error('无效的会话，或者会话已过期，请重新登录。'), { status: 401 }))
     } else if (code === 500) {
       ElMessage({ message: msg, type: 'error' })
       return Promise.reject(new Error(msg))
@@ -109,7 +109,13 @@ service.interceptors.response.use(res => {
     }
   },
   error => {
-    console.log('err' + error)
+    if (error.response?.status === 401 && !isRelogin.show) {
+      isRelogin.show = true
+      ElMessageBox.confirm('登录状态已过期，请重新登录。', '系统提示', {confirmButtonText:'重新登录',cancelButtonText:'取消',type:'warning'})
+        .then(() => useUserStore().logOut().finally(() => { location.href = '/login' }))
+        .catch(() => {})
+        .finally(() => {isRelogin.show=false})
+    }
     let { message } = error
     if (message == "Network Error") {
       message = "后端接口连接异常"
@@ -118,6 +124,8 @@ service.interceptors.response.use(res => {
     } else if (message.includes("Request failed with status code")) {
       message = "系统接口" + message.slice(-3) + "异常"
     }
+    message = error.response?.data?.message || message
+    error.message = message
     ElMessage({ message: message, type: 'error', duration: 5 * 1000 })
     return Promise.reject(error)
   }

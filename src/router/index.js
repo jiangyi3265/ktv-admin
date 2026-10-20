@@ -61,13 +61,13 @@ export const constantRoutes = [
     path: '',
     component: Layout,
     redirect: '/index',
-    hidden: true,
+    hidden: false,
     children: [
       {
         path: '/index',
         component: () => import('@/views/index'),
         name: 'Index',
-        meta: { title: '首页', icon: 'dashboard', affix: false }
+        meta: { title: 'KTV 运营', icon: 'dashboard', affix: false }
       }
     ]
   },
