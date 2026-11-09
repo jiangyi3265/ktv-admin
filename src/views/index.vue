@@ -75,7 +75,7 @@
               label="包厢"
             /><el-table-column label="状态"
               ><template #default="s"
-                ><el-tag>{{ labels[s.row.status] }}</el-tag></template
+                ><el-tag>{{ labels[s.row.status] }}</el-tag><el-tag v-if="s.row.assignmentRequired" type="danger">待分配食堂</el-tag></template
               ></el-table-column
             ><el-table-column label="金额"
               ><template #default="s"
@@ -600,7 +600,7 @@ async function rotateQr(room) {
       "原包厢码会失效，需要重新打印张贴。确认换码？",
       "重新生成二维码",
     );
-    await qr(room, "h5", true);
+    await qr(room, "mini", true);
   } catch {}
 }
 async function cancel(order) {

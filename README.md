@@ -89,4 +89,6 @@ public/           原样发布的公共资源
 
 登录后首页为 KTV 运营工作台：订单分页、取消未付款订单、转派食堂、管理员全额退款、餐品图片/售价/上下架、包厢启停、网页码/小程序码下载、食堂账号与权限、支付配置状态和操作日志。使用现有 PC JWT 身份访问统一 `/ktv-api`，仅超级管理员或具有 `ktv:manage` 权限的账号可操作，无需在浏览器另存移动管理员密码。顾客和食堂使用 ktv-app，与本后台共享同一数据库。
 
-运行 `npm run dev -- --port 5186 --strictPort` 可在本机5186端口联调。开发代理 `/dev-api`、生产代理 `/prod-api` 均转发到后端根路径。后端默认CORS包含本地5186端口，生产域名通过 `KTV_ALLOWED_ORIGINS` 显式配置。正式账号和域名准备后，按后端 `deploy/上线配置与验收.md` 执行真机支付、退款和备份恢复验收。
+运行 `npm run dev -- --port 5186 --strictPort` 可在本机5186端口联调；使用独立后端时设置 `KTV_BACKEND_ORIGIN`。开发代理 `/dev-api`、生产代理 `/prod-api` 均转发到后端根路径。部署到 `/admin/` 时设置 `VITE_APP_BASE_PATH=/admin/`。后端默认CORS包含本地5186端口，生产域名通过 `KTV_ALLOWED_ORIGINS` 显式配置。
+
+2026-11-09 已通过隔离环境的登录、餐品图片、二维码、日志及三端同步验收；线上真实支付与退款到账仍需手机确认。已更新 `follow-redirects`；继承的代码生成工具依赖链仍有安全告警，详见后端仓库的 [三端验收报告](https://github.com/jiangyi3265/ktv-backend/blob/main/deploy/2026-11-09-三端验收报告.md)。
