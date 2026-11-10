@@ -191,6 +191,7 @@
             ></el-table
           ></el-tab-pane
         >
+        <el-tab-pane label="收支总账" name="finance"><FinancePanel v-if="tab === 'finance'" /></el-tab-pane>
         <el-tab-pane label="支付接入" name="payment"
           ><el-descriptions :column="1" border
             ><el-descriptions-item label="微信登录">{{
@@ -387,6 +388,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import request from "@/utils/request";
+import FinancePanel from "./ktv/FinancePanel.vue";
 const data = reactive({
     orders: [],
     products: [],

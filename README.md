@@ -92,3 +92,9 @@ public/           原样发布的公共资源
 运行 `npm run dev -- --port 5186 --strictPort` 可在本机5186端口联调；使用独立后端时设置 `KTV_BACKEND_ORIGIN`。开发代理 `/dev-api`、生产代理 `/prod-api` 均转发到后端根路径。部署到 `/admin/` 时设置 `VITE_APP_BASE_PATH=/admin/`。后端默认CORS包含本地5186端口，生产域名通过 `KTV_ALLOWED_ORIGINS` 显式配置。
 
 2026-11-09 已通过隔离环境的登录、餐品图片、二维码、日志及三端同步验收；线上真实支付与退款到账仍需手机确认。已更新 `follow-redirects`；继承的代码生成工具依赖链仍有安全告警，详见后端仓库的 [三端验收报告](https://github.com/jiangyi3265/ktv-backend/blob/main/deploy/2026-11-09-三端验收报告.md)。
+
+## 收支总账
+
+电脑后台首页增加“收支总账”：按日期、收款/退款、完整订单号/包厢/微信单号筛选，查看全范围合计、每页 50 条明细和按日汇总，导出 CSV。仅统计真实成功收款及退款；未付款、演示订单不计入，净收款不等同于利润或可提现余额。权限和统计均由 ktv-backend 校验。
+
+2026-11-10 已完成隔离数据库下的账单、筛选、汇总、导出验收并部署至线上 `/admin/`。数据口径、权限及发布记录见 [收支账单验收](https://github.com/jiangyi3265/ktv-backend/blob/main/deploy/2026-11-10-收支账单验收.md)。
