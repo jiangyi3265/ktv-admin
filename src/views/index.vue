@@ -37,6 +37,21 @@
           ><strong>{{ data.rooms.filter((r) => r.bound).length }}</strong>
         </article>
       </section>
+      <el-alert
+        v-if="data.orderCounts.stock_issue"
+        :title="`${data.orderCounts.stock_issue} 笔订单反馈缺货，需安排转派、补货或退款`"
+        type="warning"
+        :closable="false"
+        show-icon
+        ><el-button
+          link
+          @click="
+            tab = 'orders';
+            status = 'stock_issue';
+          "
+          >查看缺货订单</el-button
+        ></el-alert
+      >
       <el-tabs v-model="tab" @tab-change="onTab">
         <el-tab-pane label="订单" name="orders">
           <div class="toolbar">
@@ -75,7 +90,10 @@
               label="包厢"
             /><el-table-column label="状态"
               ><template #default="s"
-                ><el-tag>{{ labels[s.row.status] }}</el-tag><el-tag v-if="s.row.assignmentRequired" type="danger">待分配食堂</el-tag></template
+                ><el-tag>{{ labels[s.row.status] }}</el-tag
+                ><el-tag v-if="s.row.assignmentRequired" type="danger"
+                  >待分配食堂</el-tag
+                ></template
               ></el-table-column
             ><el-table-column label="金额"
               ><template #default="s"
@@ -191,7 +209,12 @@
             ></el-table
           ></el-tab-pane
         >
-        <el-tab-pane label="收支总账" name="finance"><FinancePanel v-if="tab === 'finance'" /></el-tab-pane>
+        <el-tab-pane label="接单通知" name="notifications"
+          ><NotificationPanel v-if="tab === 'notifications'"
+        /></el-tab-pane>
+        <el-tab-pane label="收支总账" name="finance"
+          ><FinancePanel v-if="tab === 'finance'"
+        /></el-tab-pane>
         <el-tab-pane label="支付接入" name="payment"
           ><el-descriptions :column="1" border
             ><el-descriptions-item label="微信登录">{{
@@ -328,6 +351,26 @@
                 : "未付款"
           }}
         </p>
+        <el-button
+          v-if="detail.status === 'stock_issue'"
+          :disabled="busy"
+          @click="resumeStock(detail)"
+          >已补货，重新派单</el-button
+        ><el-alert
+          v-if="detail.status === 'stock_issue'"
+          title="缺货待处理"
+          type="warning"
+          :closable="false"
+          ><p>
+            {{
+              detail.stockIssue?.items
+                ?.map((x) => x.name + " × " + x.quantity)
+                .join("、")
+            }}
+          </p>
+          <p>{{ detail.stockIssue?.reason }}</p>
+          <p>备货已暂停，请转派、确认补货或处理退款。</p></el-alert
+        >
         <el-table :data="detail.items"
           ><el-table-column prop="name" label="餐品" /><el-table-column
             prop="quantity"
@@ -350,7 +393,9 @@
             >取消订单</el-button
           ><el-button
             v-if="
-              ['pending', 'preparing', 'delivering'].includes(detail.status)
+              ['pending', 'preparing', 'delivering', 'stock_issue'].includes(
+                detail.status,
+              )
             "
             :disabled="busy"
             @click="transfer(detail)"
@@ -389,6 +434,7 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import request from "@/utils/request";
 import FinancePanel from "./ktv/FinancePanel.vue";
+import NotificationPanel from "./ktv/NotificationPanel.vue";
 const data = reactive({
     orders: [],
     products: [],
@@ -409,6 +455,7 @@ const loading = ref(false),
 const labels = {
   unpaid: "待付款",
   pending: "待接单",
+  stock_issue: "缺货待处理",
   preparing: "制作中",
   delivering: "配送中",
   completed: "已完成",
@@ -551,6 +598,25 @@ async function save() {
     editing.value = false;
   } catch (e) {
     formError.value = e.message;
+  }
+}
+async function resumeStock(order) {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      "填写补货说明，确认全部货品已可供应",
+      "重新通知原备货方",
+      {
+        inputValidator: (v) =>
+          (!!v?.trim() && v.length <= 200) || "请填写不超过200字的说明",
+      },
+    );
+    await write("/orders/" + order.id + "/stock-resume", "POST", {
+      reason: value.trim(),
+      version: order.version,
+    });
+  } catch (e) {
+    if (e !== "cancel" && e !== "close")
+      ElMessage.error(e.message || "处理失败");
   }
 }
 const asset = (url) => import.meta.env.VITE_APP_BASE_API + url;
