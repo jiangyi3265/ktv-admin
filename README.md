@@ -99,6 +99,10 @@ public/           原样发布的公共资源
 
 2026-11-10 已完成隔离数据库下的账单、筛选、汇总、导出验收并部署至线上 `/admin/`。数据口径、权限及发布记录见 [收支账单验收](https://github.com/jiangyi3265/ktv-backend/blob/main/deploy/2026-11-10-收支账单验收.md)。
 
+2026-11-13 修复总账并发查询：旧的按日汇总响应不会覆盖最新结果，查询失败后切换标签不会重新显示旧金额，恢复刷新会重新读取实际账目。汇总与明细使用同一份已提交日期范围。回归及发布证据见 [边界复查](https://github.com/jiangyi3265/ktv-backend/blob/main/deploy/2026-11-13-边界复查.md)。
+
+可执行 `npm run test:finance-concurrency` 复测以上流程。需先启动后端和本项目，并在测试工具目录安装 Playwright 与 Chromium。通过环境变量 `PLAYWRIGHT_MODULE` 指定 Playwright 包路径、`KTV_PC_URL` 指定后台地址（默认 `http://127.0.0.1:5190`），`KTV_TEST_ACCESS` 指向项目外的凭据 JSON（结构为 `{"pc":{"username":"测试账号","password":"测试密码"}}`）。测试账号须有 KTV 管理权限，测试环境验证码须关闭；不将真实密码写入仓库。`KTV_TEST_OUTPUT` 可指定截图/报告目录，默认 `.local/finance-concurrency`。测试只读业务接口，延迟和失败响应仅在测试浏览器内模拟。
+
 ## 备货异常与接单通知
 
 订单列表会突出缺货订单。打开「查看与处理」可查看缺货餐品和原因、补货重新派单、转派其他备货账号或发起全额退款。补货和转派都会记录操作日志。

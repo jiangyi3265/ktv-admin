@@ -38,14 +38,43 @@ const dates=ref([today.slice(0,7)+'-01',today]),kind=ref(''),search=ref(''),page
 const data=reactive({entries:[],total:0,receiptCents:0,refundCents:0,netCents:0});
 const money=value=>(Number(value||0)/100).toFixed(2);
 const params=()=>({from:dates.value?.[0]||'',to:dates.value?.[1]||'',kind:kind.value,search:search.value.trim(),page:page.value});
-let sequence=0,timer;
-async function refresh(){const epoch=++sequence;loading.value=true;error.value='';try{const result=await request({url:'/ktv-api/finance/ledger',params:params()});if(epoch!==sequence)return;Object.assign(data,result);if(view.value==='daily')await loadDaily();}catch(e){if(epoch===sequence){error.value=e.message||'账单加载失败，请重试';Object.assign(data,{entries:[],total:0,receiptCents:0,refundCents:0,netCents:0});}}finally{if(epoch===sequence)loading.value=false;}}
-async function loadDaily(){daily.value=[];try{daily.value=await request({url:'/ktv-api/finance/daily',params:{from:dates.value[0],to:dates.value[1]}});}catch(e){error.value=e.message||'按日汇总加载失败';}}
-function changeView(name){if(name==='daily')loadDaily();}
+let sequence=0,dailySequence=0,timer,appliedQuery=params(),summaryReady=false;
+function clearDaily(){dailySequence++;daily.value=[];}
+async function refresh(){
+  const epoch=++sequence,query=params();
+  appliedQuery=query;
+  summaryReady=false;
+  clearDaily();
+  loading.value=true;error.value='';
+  try{
+    const result=await request({url:'/ktv-api/finance/ledger',params:query});
+    if(epoch!==sequence)return;
+    Object.assign(data,result);
+    summaryReady=true;
+    if(view.value==='daily')await loadDaily(query,epoch);
+  }catch(e){
+    if(epoch===sequence){
+      clearDaily();
+      error.value=e.message||'账单加载失败，请重试';
+      Object.assign(data,{entries:[],total:0,receiptCents:0,refundCents:0,netCents:0});
+    }
+  }finally{if(epoch===sequence)loading.value=false;}
+}
+async function loadDaily(query=appliedQuery,parent=sequence){
+  if(!summaryReady||parent!==sequence)return;
+  const epoch=++dailySequence;
+  daily.value=[];error.value='';
+  const current=()=>epoch===dailySequence&&parent===sequence&&view.value==='daily';
+  try{
+    const result=await request({url:'/ktv-api/finance/daily',params:{from:query.from,to:query.to}});
+    if(current())daily.value=result;
+  }catch(e){if(current())error.value=e.message||'按日汇总加载失败';}
+}
+function changeView(name){clearDaily();if(summaryReady)error.value='';if(name==='daily')loadDaily();}
 function query(){page.value=1;refresh();}
 async function exportCsv(){exporting.value=true;try{const blob=await request({url:'/ktv-api/finance/export',params:params(),responseType:'blob'});if(blob.type.includes('json'))throw Error(JSON.parse(await blob.text()).message||'导出失败');saveAs(blob,'KTV收支账单-'+dates.value.join('_')+'.csv');ElMessage.success('账单已导出');}catch(e){error.value=e.message||'导出失败';}finally{exporting.value=false;}}
 onMounted(()=>{refresh();timer=setInterval(()=>{if(!document.hidden&&!loading.value)refresh();},30000);});
-onUnmounted(()=>{sequence++;clearInterval(timer);});
+onUnmounted(()=>{sequence++;clearDaily();clearInterval(timer);});
 </script>
 <style scoped>
 .finance-heading{display:flex;justify-content:space-between;align-items:center;gap:20px;margin:12px 0 22px}.finance-heading h2{margin:0 0 8px;font-size:22px;color:var(--el-text-color-primary)}.finance-heading p,.finance-note{color:var(--el-text-color-secondary);font-size:13px;line-height:1.7;margin:0}.finance-filters{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0}.finance-filters .el-select{width:140px}.finance-filters .el-input{width:260px}.finance-filters :deep(.el-date-editor){max-width:360px}.finance-summary{display:flex;flex-wrap:wrap;gap:32px;padding:20px 0;border-top:1px solid var(--el-border-color-lighter);border-bottom:1px solid var(--el-border-color-lighter);margin:16px 0 10px}.finance-summary div{min-width:140px}.finance-summary dt{font-size:13px;color:var(--el-text-color-secondary);margin-bottom:8px}.finance-summary dd{margin:0;font-size:25px;font-weight:600;font-variant-numeric:tabular-nums}.finance-note{margin-bottom:18px}.finance-pagination{display:flex;justify-content:flex-end;margin-top:18px}.receipt{color:var(--el-color-success);font-variant-numeric:tabular-nums}.refund{color:var(--el-color-warning);font-variant-numeric:tabular-nums}@media(max-width:700px){.finance-heading{align-items:flex-start;flex-direction:column}.finance-filters>*{max-width:100%}.finance-summary{gap:20px}.finance-summary div{min-width:120px}.finance-pagination{overflow:auto;justify-content:flex-start}}
