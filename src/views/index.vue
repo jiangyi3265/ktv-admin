@@ -276,7 +276,7 @@
       "
       width="480px"
       :close-on-click-modal="false"
-      ><el-form label-position="top" @submit.prevent="save">
+      ><el-form label-position="top" :disabled="busy" @submit.prevent="save">
         <template v-if="kind === 'product'"
           ><el-form-item label="餐品名称"
             ><el-input v-model="form.name" maxlength="60" /></el-form-item
@@ -302,7 +302,8 @@
               class="food-preview" /><input
               type="file"
               accept="image/png,image/jpeg"
-              @change="upload" /></el-form-item
+              :disabled="busy"
+              @change="upload" /><span v-if="uploading" role="status">图片上传中，请稍候…</span></el-form-item
           ><el-switch v-model="form.onSale" active-text="上架"
         /></template>
         <template v-else-if="kind === 'room'"
@@ -328,7 +329,7 @@
         <p v-if="formError" class="error">{{ formError }}</p></el-form
       ><template #footer
         ><el-button @click="editing = false">取消</el-button
-        ><el-button type="primary" :loading="busy" @click="save"
+        ><el-button type="primary" :loading="busy" :disabled="uploading" @click="save"
           >保存</el-button
         ></template
       ></el-dialog
@@ -420,12 +421,14 @@
       >
     </el-drawer>
     <el-dialog v-model="qrOpen" title="包厢点餐码" width="480px"
-      ><img :src="qrData.image" class="qr" />
-      <p>{{ qrData.room }} 包厢</p>
-      <a :href="qrData.image" :download="qrData.room + '-qrcode.png'"
-        >保存二维码图片</a
-      >
-      <p v-if="qrData.url">{{ qrData.url }}</p></el-dialog
+      ><p>{{ qrData.room }} 包厢</p>
+      <p v-if="qrLoading" role="status">正在生成点餐码，请稍候…</p>
+      <p v-else-if="qrError" class="error">{{ qrError }}</p>
+      <template v-else-if="qrData.image">
+        <img :src="qrData.image" class="qr" />
+        <a :href="qrData.image" :download="qrData.room + '-qrcode.png'">保存二维码图片</a>
+        <p v-if="qrData.url">{{ qrData.url }}</p>
+      </template></el-dialog
     >
   </main>
 </template>
@@ -530,6 +533,10 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   stopped = true;
+  readVersion++;
+  editorEpoch++;
+  invalidateUploads();
+  qrEpoch++;
   clearTimeout(timer);
   clearTimeout(filterTimer);
 });
@@ -548,9 +555,16 @@ async function write(path, method, body) {
 const editing = ref(false),
   kind = ref(""),
   form = reactive({}),
+  uploading = ref(false),
   formError = ref("");
-let originalId = "";
+let originalId = "", editorEpoch = 0, uploadEpoch = 0;
+function invalidateUploads() { uploadEpoch++; uploading.value = false; }
+watch(editing, (open) => {
+  if (!open) { editorEpoch++; invalidateUploads(); }
+}, { flush: "sync" });
 function edit(type, row) {
+  editorEpoch++;
+  invalidateUploads();
   kind.value = type;
   originalId = row?.id || "";
   Object.keys(form).forEach((k) => delete form[k]);
@@ -583,6 +597,8 @@ function edit(type, row) {
   editing.value = true;
 }
 async function save() {
+  if (uploading.value) { formError.value = "图片正在上传，请稍候再保存"; return; }
+  const epoch = editorEpoch;
   formError.value = "";
   try {
     if (kind.value !== "room" && !form.name?.trim()) throw Error("请填写名称");
@@ -595,9 +611,9 @@ async function save() {
     await write(path, kind.value === "account" && !form.id ? "POST" : "PUT", {
       ...form,
     });
-    editing.value = false;
+    if (epoch === editorEpoch) editing.value = false;
   } catch (e) {
-    formError.value = e.message;
+    if (epoch === editorEpoch) formError.value = e.message;
   }
 }
 async function resumeStock(order) {
@@ -622,13 +638,19 @@ async function resumeStock(order) {
 const asset = (url) => import.meta.env.VITE_APP_BASE_API + url;
 async function upload(event) {
   const file = event.target.files?.[0];
+  event.target.value = "";
   if (!file) return;
+  const editor = editorEpoch, epoch = ++uploadEpoch;
+  const current = () => editing.value && kind.value === "product" && editor === editorEpoch && epoch === uploadEpoch;
+  uploading.value = false;
+  formError.value = "";
   if (file.size > 2 * 1024 * 1024) {
     formError.value = "图片不能超过2 MB";
     return;
   }
   const body = new FormData();
   body.append("file", file);
+  uploading.value = true;
   try {
     const result = await request({
       url: "/ktv-api/images",
@@ -636,18 +658,26 @@ async function upload(event) {
       data: body,
       headers: { "Content-Type": "multipart/form-data", repeatSubmit: false },
     });
-    form.customImage = result.url;
+    if (current()) { form.customImage = result.url; formError.value = ""; }
   } catch (e) {
-    formError.value = e.message;
+    if (current()) formError.value = e.message;
+  } finally {
+    if (current()) uploading.value = false;
   }
 }
 const qrOpen = ref(false),
-  qrData = reactive({});
+  qrData = reactive({}), qrLoading = ref(false), qrError = ref("");
+let qrEpoch = 0;
+watch(qrOpen, (open) => { if (!open) { qrEpoch++; qrLoading.value = false; } }, { flush: "sync" });
 async function qr(room, type, rotate = false) {
+  const epoch = ++qrEpoch;
+  Object.keys(qrData).forEach(key => delete qrData[key]);
+  qrData.room = room.id;
+  qrError.value = "";
+  qrLoading.value = true;
+  qrOpen.value = true;
   try {
-    Object.assign(
-      qrData,
-      await api(
+    const result = await api(
         "/rooms/" +
           encodeURIComponent(room.id) +
           "/qr?type=" +
@@ -655,11 +685,12 @@ async function qr(room, type, rotate = false) {
           "&rotate=" +
           rotate,
         "POST",
-      ),
-    );
-    qrOpen.value = true;
+      );
+    if (epoch === qrEpoch) Object.assign(qrData, result);
   } catch (e) {
-    error.value = e.message;
+    if (epoch === qrEpoch) qrError.value = e.message || "二维码生成失败，请重试";
+  } finally {
+    if (epoch === qrEpoch) qrLoading.value = false;
   }
 }
 async function rotateQr(room) {

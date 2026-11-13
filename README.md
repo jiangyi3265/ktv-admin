@@ -103,6 +103,12 @@ public/           原样发布的公共资源
 
 可执行 `npm run test:finance-concurrency` 复测以上流程。需先启动后端和本项目，并在测试工具目录安装 Playwright 与 Chromium。通过环境变量 `PLAYWRIGHT_MODULE` 指定 Playwright 包路径、`KTV_PC_URL` 指定后台地址（默认 `http://127.0.0.1:5190`），`KTV_TEST_ACCESS` 指向项目外的凭据 JSON（结构为 `{"pc":{"username":"测试账号","password":"测试密码"}}`）。测试账号须有 KTV 管理权限，测试环境验证码须关闭；不将真实密码写入仓库。`KTV_TEST_OUTPUT` 可指定截图/报告目录，默认 `.local/finance-concurrency`。测试只读业务接口，延迟和失败响应仅在测试浏览器内模拟。
 
+## 餐品图片与包厢码回归
+
+2026-11-13 补充修复编辑窗口与上传请求的交叉操作：图片上传完毕前阻止保存，只采用当前窗口最后选择的图片，关闭窗口后旧上传和旧保存结果不会影响下一道餐品。同一张图片上传失败后可重新选择重试。包厢码弹窗显示生成进度，切换包厢或码类型时清除旧链接，关闭窗口后忽略迟到响应。
+
+`npm run test:editor-concurrency` 使用与财务回归相同的 `PLAYWRIGHT_MODULE`、`KTV_TEST_ACCESS`、`KTV_PC_URL`、`KTV_TEST_OUTPUT` 环境变量。登录读取初始状态后，脚本拦截所有 KTV 业务请求，在浏览器中验证 7 个编辑/二维码场景；图片、餐品保存和二维码均为测试响应，不向服务器写业务记录。后端同时修复换码失败导致旧码失效的问题，详见 [第二轮专项复查](https://github.com/jiangyi3265/ktv-backend/blob/main/deploy/2026-11-13-二维码与编辑复查.md)。
+
 ## 备货异常与接单通知
 
 订单列表会突出缺货订单。打开「查看与处理」可查看缺货餐品和原因、补货重新派单、转派其他备货账号或发起全额退款。补货和转派都会记录操作日志。

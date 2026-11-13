@@ -10,7 +10,8 @@
     "build:prod": "vite build",
     "build:stage": "vite build --mode staging",
     "preview": "vite preview",
-    "test:finance-concurrency": "node tests/finance-concurrency.cjs"
+    "test:finance-concurrency": "node tests/finance-concurrency.cjs",
+    "test:editor-concurrency": "node tests/editor-concurrency.cjs"
   },
   "repository": {
     "type": "git",
