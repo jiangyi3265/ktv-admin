@@ -4,8 +4,7 @@
       <div>
         <h2>接单通知</h2>
         <p>
-          新订单提醒备货方，缺货及超过
-          {{ data.overdueMinutes || 5 }} 分钟未接单提醒商家。
+          顾客接收订单进度，备货方接收新单与转派，商家接收付款下单、已接单、缺货及超时提醒。
         </p>
       </div>
       <el-button @click="load">刷新状态</el-button>
@@ -17,6 +16,10 @@
       type="warning"
       :closable="false"
     />
+    <h3>连接管理员微信</h3>
+    <p>用自己的微信扫描下方小程序码，使用本电脑后台账号登录，再依次点击「连接微信提醒」和「授权接收微信提醒」。完成后点击刷新状态。</p>
+    <el-button :loading="entryLoading" @click="loadEntry">{{ entryUrl ? '刷新管理员小程序码' : '显示管理员小程序码' }}</el-button>
+    <div v-if="entryUrl" class="notice-entry"><img :src="entryUrl" alt="使用微信扫描，进入小程序管理员登录" width="200" height="200" /><p>每位管理员使用自己的后台账号与微信授权。扫码本身不会完成登录或授权。</p></div>
     <h3>接收人员与接单群</h3>
     <p>
       企业微信群可持续接收通知。请让对应备货人员加入群，并打开群消息提醒。机器人地址保存后不会回显。
@@ -93,18 +96,18 @@
     </el-form>
     <h3>微信订阅提醒</h3>
     <p>
-      当前模板：{{
-        data.template?.title || "未配置"
-      }}。备货人员需在小程序「接单工作台」连接微信并授权；一次性订阅每授权一次只能发送一条，不能替代持续接单群。
+      商家及备货模板：{{ data.template?.title || "未配置" }}。顾客进度模板：{{ data.customerTemplate?.title || "未配置" }}。三端都需要本人在小程序授权；一次性订阅每授权一次只能发送一条。
     </p>
     <el-button @click="loadTemplates" :loading="templatesLoading"
       >选择或更新微信模板</el-button
     >
     <el-form
       v-if="templates !== null"
+      :disabled="saving"
       label-position="top"
       class="notice-config"
     >
+      <el-form-item label="模板用途"><el-radio-group v-model="templateScope" @change="resetTemplate"><el-radio-button value="template">商家与备货</el-radio-button><el-radio-button value="customer-template">顾客订单进度</el-radio-button></el-radio-group></el-form-item>
       <el-alert
         v-if="!templates.length"
         title="该小程序尚未添加订阅消息模板，请在微信公众平台添加合适的订单通知模板后刷新。"
@@ -193,7 +196,7 @@
   </section>
 </template>
 <script setup>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import request from "@/utils/request";
 const data = reactive({
@@ -212,6 +215,21 @@ const templates = ref(null),
   templateId = ref(""),
   templateFields = ref([]),
   fields = reactive({});
+const templateScope = ref("template"), entryUrl = ref(""), entryLoading = ref(false);
+let alive = true, entrySequence = 0;
+onUnmounted(() => { alive = false; entrySequence++; if (entryUrl.value) URL.revokeObjectURL(entryUrl.value); });
+async function loadEntry() {
+  const sequence = ++entrySequence; entryLoading.value = true; error.value = "";
+  try {
+    const blob = await request({ url: "/ktv-api/notifications/admin-entry", method: "get", responseType: "blob" });
+    if (!alive || sequence !== entrySequence) return;
+    if (!blob.type.startsWith("image/")) throw new Error("小程序码生成失败，请稍后重试");
+    if (entryUrl.value) URL.revokeObjectURL(entryUrl.value);
+    entryUrl.value = URL.createObjectURL(blob);
+  } catch (e) { if (alive && sequence === entrySequence) error.value = e.message; }
+  finally { if (alive && sequence === entrySequence) entryLoading.value = false; }
+}
+function resetTemplate() { templateId.value = ""; templateFields.value = []; Object.keys(fields).forEach(k => delete fields[k]); }
 const api = (path, method = "get", body) =>
   request({ url: "/ktv-api/notifications" + path, method, data: body });
 const statuses = {
@@ -225,6 +243,7 @@ const statuses = {
   cancelled: "订单已变化，取消提醒",
 };
 const kinds = {
+  paid: "顾客付款下单", accepted: "备货已接单", delivering: "开始配送", completed: "已送达", refunded: "已退款",
   new_order: "待接单",
   reassigned: "订单转派",
   overdue: "超时未接单",
@@ -248,7 +267,7 @@ const reasons = {
 const reason = (code) =>
   code ? reasons[code] || "渠道返回 " + code + "，请检查通知配置" : "";
 const targetName = (scope) =>
-  data.targets.find((t) => t.scope === scope)?.name || scope;
+  scope === "customer" ? "订单顾客" : data.targets.find((t) => t.scope === scope)?.name || scope;
 async function load() {
   loading.value = true;
   error.value = "";
@@ -351,7 +370,7 @@ function selectTemplate() {
 }
 function saveTemplate() {
   return saveConfig({
-    scope: "template",
+    scope: templateScope.value,
     templateId: templateId.value,
     fields: { ...fields },
   });
@@ -376,6 +395,9 @@ onMounted(load);
 .notice-panel {
   padding: 12px 0 28px;
 }
+.notice-entry { display: flex; gap: 24px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.notice-entry img { display: block; flex: 0 0 auto; }
+.notice-entry p { max-width: 42ch; }
 .notice-header {
   display: flex;
   justify-content: space-between;
