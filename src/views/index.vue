@@ -16,6 +16,7 @@
       show-icon
     />
     <template v-if="ready">
+      <OrderingControl :settings="data.ordering" @saved="orderingSaved" @reload="refresh(true)" />
       <section class="metrics">
         <article>
           <span>待接单</span
@@ -438,6 +439,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import request from "@/utils/request";
 import FinancePanel from "./ktv/FinancePanel.vue";
 import NotificationPanel from "./ktv/NotificationPanel.vue";
+import OrderingControl from "./ktv/OrderingControl.vue";
 const data = reactive({
     orders: [],
     products: [],
@@ -484,6 +486,12 @@ let timer,
   filterTimer,
   stopped = false,
   readVersion = 0;
+function orderingSaved(settings) {
+  readVersion++;
+  data.ordering = settings;
+  data.orderingEnabled = settings.enabled;
+  refresh(true);
+}
 async function refresh(silent = false) {
   const version = ++readVersion;
   if (!silent) loading.value = true;
