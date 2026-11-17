@@ -2,7 +2,7 @@
   <section class="ordering-control" aria-labelledby="ordering-control-title">
     <div class="ordering-description">
       <h2 id="ordering-control-title">小程序点餐服务</h2>
-      <p>{{ settings?.enabled ? '已开放，顾客可查看餐品、下单并支付。' : '已关闭，顾客看到暂停营业页面，不能新下单或发起支付。' }}</p>
+      <p>{{ settings?.enabled ? '已开放，顾客可查看餐品、下单并支付。' : '已关闭，点餐页面和入口已隐藏，顾客直接进入我的订单。' }}</p>
       <p class="ordering-help">已有订单、收款记录和备货配送继续保留。恢复营业前，请完成所需资质、服务类目及微信平台审核。</p>
     </div>
     <div class="ordering-action">
@@ -33,7 +33,7 @@ async function toggle() {
   busy.value = true; error.value = '';
   try {
     await ElMessageBox.confirm(
-      enabled ? '确认已完成相关资质、服务类目及平台审核后，再开放点餐。开启后所有顾客均可查看餐品、下单和支付。' : '关闭后所有顾客统一显示暂停营业，停止新下单和发起支付。已有订单继续处理；已发起支付的结果仍会正常入账。',
+      enabled ? '确认已完成相关资质、服务类目及平台审核后，再开放点餐。开启后所有顾客均可查看餐品、下单和支付。' : '关闭后所有顾客统一隐藏点餐页面及入口，直接进入我的订单，停止新下单和发起支付。已有订单继续处理；已发起支付的结果仍会正常入账。',
       enabled ? '开启点餐服务' : '暂停点餐服务',
       { confirmButtonText: enabled ? '确认开启' : '确认关闭', cancelButtonText: '取消', type: 'warning' },
     );
