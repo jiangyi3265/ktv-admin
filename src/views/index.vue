@@ -17,6 +17,7 @@
     />
     <template v-if="ready">
       <OrderingControl :settings="data.ordering" @saved="orderingSaved" @reload="refresh(true)" />
+      <StaffPortalControl :settings="data.staffPortal" @saved="staffPortalSaved" @reload="refresh(true)" />
       <section class="metrics">
         <article>
           <span>待接单</span
@@ -440,6 +441,7 @@ import request from "@/utils/request";
 import FinancePanel from "./ktv/FinancePanel.vue";
 import NotificationPanel from "./ktv/NotificationPanel.vue";
 import OrderingControl from "./ktv/OrderingControl.vue";
+import StaffPortalControl from "./ktv/StaffPortalControl.vue";
 const data = reactive({
     orders: [],
     products: [],
@@ -486,6 +488,11 @@ let timer,
   filterTimer,
   stopped = false,
   readVersion = 0;
+function staffPortalSaved(settings) {
+  readVersion++;
+  data.staffPortal = settings;
+  refresh(true);
+}
 function orderingSaved(settings) {
   readVersion++;
   data.ordering = settings;
